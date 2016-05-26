@@ -16,7 +16,8 @@ import (
 type Op string
 
 const (
-	EOF = rune(0)
+	HUNDRED = 100.0
+	EOF     = rune(0)
 )
 
 type Expr struct {
@@ -45,6 +46,9 @@ func (e *Expr) eval() float64 {
 		return toFixed(e.left / percentCalc(e.left, e.right))
 	case "of":
 		return toFixed(percentCalc(e.right, e.left))
+
+	case "in":
+		return toFixed(inCalc(e.left, e.right))
 	}
 	return -1.0 // dead
 }
@@ -61,11 +65,16 @@ func (e *Expr) PrintExpr() string {
 		return fmt.Sprintf("%s ÷ %s%%", humanize.Commaf(e.left), humanize.Commaf(e.right))
 	case "of":
 		return fmt.Sprintf("%s%% of %s", humanize.Commaf(e.left), humanize.Commaf(e.right))
+	case "in":
+		return fmt.Sprintf("%s in %s", humanize.Commaf(e.left), humanize.Commaf(e.right))
 	}
 	return "-1.0" // dead
 }
 
 func (e *Expr) PrintValue() string {
+	if e.Op == "in" {
+		return fmt.Sprintf("%s%%", humanize.Commaf(e.eval()))
+	}
 	return fmt.Sprintf("%s", humanize.Commaf(e.eval()))
 }
 
@@ -139,6 +148,12 @@ OPLOOP:
 				parsedExpr.Op = Op("of")
 				break OPLOOP
 			}
+		case 'i', 'I':
+			ch := scanner.read()
+			if ch == 'n' || ch == 'N' {
+				parsedExpr.Op = Op("in")
+				break OPLOOP
+			}
 		}
 		scanner.unread()
 		break
@@ -177,7 +192,11 @@ OPLOOP:
 }
 
 func percentCalc(x, p float64) float64 {
-	return (x / 100.0) * p
+	return (x / HUNDRED) * p
+}
+
+func inCalc(x, y float64) float64 {
+	return (x / y) * HUNDRED
 }
 
 func round(num float64) int {
