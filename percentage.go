@@ -17,6 +17,7 @@ type Op string
 
 const (
 	HUNDRED = 100.0
+	MAX     = -92233720368547760
 	EOF     = rune(0)
 )
 
@@ -34,23 +35,46 @@ func NewExpr(exp string) (*Expr, error) {
 	return e, nil
 }
 
-func (e *Expr) eval() float64 {
+func (e *Expr) eval() (float64, error) {
 	switch e.Op {
 	case "+":
-		return toFixed(e.left + percentCalc(e.left, e.right))
+		evaled := toFixed(e.left + percentCalc(e.left, e.right))
+		if evaled == MAX {
+			return -1, errors.New("too big!")
+		}
+		return evaled, nil
 	case "-":
-		return toFixed(e.left - percentCalc(e.left, e.right))
+		evaled := toFixed(e.left - percentCalc(e.left, e.right))
+		if evaled == MAX {
+			return -1, errors.New("too big!")
+		}
+		return evaled, nil
 	case "*", "x", "X":
-		return toFixed(e.left * percentCalc(e.left, e.right))
+		evaled := toFixed(e.left * percentCalc(e.left, e.right))
+		if evaled == MAX {
+			return -1, errors.New("too big!")
+		}
+		return evaled, nil
 	case "/":
-		return toFixed(e.left / percentCalc(e.left, e.right))
+		evaled := toFixed(e.left / percentCalc(e.left, e.right))
+		if evaled == MAX {
+			return -1, errors.New("too big!")
+		}
+		return evaled, nil
 	case "of":
-		return toFixed(percentCalc(e.right, e.left))
-
+		evaled := toFixed(percentCalc(e.right, e.left))
+		if evaled == MAX {
+			return -1, errors.New("too big!")
+		}
+		return evaled, nil
 	case "in":
-		return toFixed(inCalc(e.left, e.right))
+		evaled, err := inCalc(e.left, e.right)
+		if err != nil {
+			return -1, err
+		}
+		return toFixed(evaled), nil
 	}
-	return -1.0 // dead
+	return -1.0, errors.New("No operator match") // dead
 }
 
 func (e *Expr) PrintExpr() string {
@@ -72,10 +96,14 @@ func (e *Expr) PrintExpr() string {
 }
 
 func (e *Expr) PrintValue() string {
-	if e.Op == "in" {
-		return fmt.Sprintf("%s%%", humanize.Commaf(e.eval()))
+	evaled, err := e.eval()
+	if err != nil {
+		return err.Error()
 	}
-	return fmt.Sprintf("%s", humanize.Commaf(e.eval()))
+	if e.Op == "in" {
+		return fmt.Sprintf("%s%%", humanize.Commaf(evaled))
+	}
+	return fmt.Sprintf("%s", humanize.Commaf(evaled))
 }
 
 type Scanner struct {
@@ -195,8 +223,11 @@ func percentCalc(x, p float64) float64 {
 	return (x / HUNDRED) * p
 }
 
-func inCalc(x, y float64) float64 {
-	return (x / y) * HUNDRED
+func inCalc(x, y float64) (float64, error) {
+	if y == 0 {
+		return -1, errors.New("NaN")
+	}
+	return (x / y) * HUNDRED, nil
 }
 
 func round(num float64) int {
